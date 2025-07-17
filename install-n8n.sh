@@ -102,10 +102,10 @@ echo ""
 
 # Automatically run the setup script
 echo ""
-echo "🔄 Running n8n setup script..."
-echo "=============================="
+echo "🔄 Next Step: Run n8n setup script..."
+echo "======================================"
+echo " ./setup-n8n.sh" 
 cd n8ncf
-./setup-n8n.sh
 
 echo ""
-echo "🎯 Installation completed successfully!"
+
