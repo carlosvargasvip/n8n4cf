@@ -155,6 +155,9 @@ cat > "$config_file" << EOF
 tunnel: $tunnel_id
 credentials-file: $config_dir/$tunnel_id.json
 
+# Disable ICMP proxy to avoid permission warnings
+no-icmp-proxy: true
+
 ingress:
   - hostname: $hostname
     service: http://$ip_address:5678
