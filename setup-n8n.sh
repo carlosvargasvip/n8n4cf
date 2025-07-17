@@ -29,30 +29,19 @@ echo ""
 if [ -f ".env" ]; then
     echo "Warning: .env file already exists!"
     read -p "Do you want to overwrite it? (y/N): " overwrite
-    if [[ ! $overwrite =~ ^[Yy]$ ]]; then
-        echo "Using existing .env file..."
+    if [[ $overwrite =~ ^[Yy]$ ]]; then
+        create_new_env=true
     else
-        echo ""
-        echo "Enter PostgreSQL configuration:"
-        echo ""
-        
-        read -p "PostgreSQL admin user: " pg_user
-        read -p "PostgreSQL admin password: " pg_password
-        read -p "Database name: " pg_db
-        read -p "Non-root user: " pg_nonroot_user
-        read -p "Non-root password: " pg_nonroot_password
-        
-        # Create .env file
-        cat > .env << EOF
-POSTGRES_USER=$pg_user
-POSTGRES_PASSWORD=$pg_password
-POSTGRES_DB=$pg_db
-POSTGRES_NON_ROOT_USER=$pg_nonroot_user
-POSTGRES_NON_ROOT_PASSWORD=$pg_nonroot_password
-EOF
-        echo "✅ .env file created!"
+        echo "Using existing .env file..."
+        create_new_env=false
     fi
 else
+    create_new_env=true
+fi
+
+# Create new .env file if needed
+if [ "$create_new_env" = true ]; then
+    echo ""
     echo "Enter PostgreSQL configuration:"
     echo ""
     
