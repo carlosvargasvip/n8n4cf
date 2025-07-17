@@ -46,43 +46,36 @@ echo ""
 
 # Get tunnel configuration from user
 echo "🌐 Domain Configuration:"
-echo "1) Use free Cloudflare domain (yourname.cfargotunnel.com)"
-echo "2) Use your own custom domain"
 echo ""
-read -p "Choose option (1/2): " domain_option
+read -p "Enter your domain (e.g., yourdomain.com): " user_domain
 
-if [ "$domain_option" = "2" ]; then
-    read -p "Enter your custom domain (e.g., n8n.yourdomain.com): " custom_domain
-    if [ -z "$custom_domain" ]; then
-        echo "❌ Custom domain cannot be empty."
-        exit 1
-    fi
-    hostname="$custom_domain"
-    echo "✅ Using custom domain: $hostname"
-else
-    read -p "Enter the name for your tunnel (this will be part of your URL): " tunnel_name
-    if [ -z "$tunnel_name" ]; then
-        echo "❌ Tunnel name cannot be empty."
-        exit 1
-    fi
-    
-    # Validate tunnel name (basic validation)
-    if [[ ! "$tunnel_name" =~ ^[a-zA-Z0-9-]+$ ]]; then
-        echo "❌ Tunnel name can only contain letters, numbers, and hyphens."
-        exit 1
-    fi
-    
-    hostname="$tunnel_name.cfargotunnel.com"
-    echo "✅ Using Cloudflare domain: $hostname"
+if [ -z "$user_domain" ]; then
+    echo "❌ Domain cannot be empty."
+    exit 1
 fi
 
+read -p "Enter subdomain for n8n (e.g., n8n): " subdomain
+if [ -z "$subdomain" ]; then
+    echo "❌ Subdomain cannot be empty."
+    exit 1
+fi
+
+# Validate subdomain (basic validation)
+if [[ ! "$subdomain" =~ ^[a-zA-Z0-9-]+$ ]]; then
+    echo "❌ Subdomain can only contain letters, numbers, and hyphens."
+    exit 1
+fi
+
+hostname="$subdomain.$user_domain"
+tunnel_name="$subdomain"
+
+echo "✅ Using domain: $hostname"
+
 echo ""
 
-# Check if tunnel already exists (use tunnel_name for both cases)
-tunnel_name_for_creation=${tunnel_name:-$(echo "$custom_domain" | cut -d'.' -f1)}
-
-if cloudflared tunnel list | grep -q "$tunnel_name_for_creation"; then
-    echo "⚠️  Tunnel '$tunnel_name_for_creation' already exists!"
+# Check if tunnel already exists
+if cloudflared tunnel list | grep -q "$tunnel_name"; then
+    echo "⚠️  Tunnel '$tunnel_name' already exists!"
     read -p "Do you want to use the existing tunnel? (Y/n): " use_existing
     use_existing=${use_existing:-Y}
     
@@ -90,12 +83,12 @@ if cloudflared tunnel list | grep -q "$tunnel_name_for_creation"; then
         echo "❌ Please choose a different tunnel name and run the script again."
         exit 1
     fi
-    echo "✅ Using existing tunnel: $tunnel_name_for_creation"
+    echo "✅ Using existing tunnel: $tunnel_name"
 else
     # Create the tunnel
-    echo "🔧 Creating tunnel: $tunnel_name_for_creation"
-    if cloudflared tunnel create "$tunnel_name_for_creation"; then
-        echo "✅ Tunnel '$tunnel_name_for_creation' created successfully!"
+    echo "🔧 Creating tunnel: $tunnel_name"
+    if cloudflared tunnel create "$tunnel_name"; then
+        echo "✅ Tunnel '$tunnel_name' created successfully!"
     else
         echo "❌ Failed to create tunnel. Please check your permissions and try again."
         exit 1
@@ -105,7 +98,7 @@ fi
 echo ""
 
 # Get tunnel ID
-tunnel_id=$(cloudflared tunnel list | grep "$tunnel_name_for_creation" | awk '{print $1}')
+tunnel_id=$(cloudflared tunnel list | grep "$tunnel_name" | awk '{print $1}')
 if [ -z "$tunnel_id" ]; then
     echo "❌ Could not find tunnel ID. Please check the tunnel was created properly."
     exit 1
@@ -137,48 +130,96 @@ echo ""
 # Show configuration
 echo "📋 Tunnel Configuration:"
 echo "========================"
-echo "Tunnel Name: $tunnel_name_for_creation"
+echo "Tunnel Name: $tunnel_name"
 echo "Tunnel ID: $tunnel_id"
 echo "Local Service: http://localhost:5678"
 echo "Public URL: https://$hostname"
 echo ""
 
-# Set up DNS (route traffic)
-echo "🌐 Setting up DNS routing..."
-if [ "$domain_option" = "2" ]; then
-    echo "⚠️  For custom domains, you need to manually add a CNAME record in Cloudflare:"
-    echo "   CNAME: $custom_domain -> $tunnel_id.cfargotunnel.com"
-    echo "   Or run: cloudflared tunnel route dns $tunnel_name_for_creation $custom_domain"
+# Install and start tunnel as a service
+echo "🔧 Installing Cloudflare Tunnel as a system service..."
+
+# Verify config file exists
+if [ ! -f "$config_file" ]; then
+    echo "❌ Config file not found at $config_file"
+    exit 1
+fi
+
+echo "✅ Config file found at: $config_file"
+
+# Try different methods to install the service
+echo "📝 Attempting service installation..."
+
+# Method 1: Install with explicit config path
+if sudo cloudflared --config "$config_file" service install; then
+    echo "✅ Cloudflare Tunnel service installed successfully (Method 1)!"
+    service_installed=true
+elif sudo cloudflared service install --config "$config_file"; then
+    echo "✅ Cloudflare Tunnel service installed successfully (Method 2)!"
+    service_installed=true
 else
-    if cloudflared tunnel route dns "$tunnel_name_for_creation" "$hostname"; then
-        echo "✅ DNS routing configured successfully!"
+    # Method 3: Copy config to system location and install
+    echo "⚠️  Standard installation failed. Trying system config location..."
+    sudo mkdir -p /etc/cloudflared
+    sudo cp "$config_file" /etc/cloudflared/config.yml
+    sudo cp "$config_dir/$tunnel_id.json" /etc/cloudflared/
+    
+    # Update config to use system paths
+    sudo sed -i "s|$config_dir|/etc/cloudflared|g" /etc/cloudflared/config.yml
+    
+    if sudo cloudflared service install; then
+        echo "✅ Cloudflare Tunnel service installed successfully (Method 3)!"
+        service_installed=true
     else
-        echo "⚠️  DNS routing failed. You may need to set this up manually in the Cloudflare dashboard."
+        echo "❌ All installation methods failed."
+        service_installed=false
     fi
 fi
 
-echo ""
+if [ "$service_installed" = true ]; then
 
-# Ask if user wants to start the tunnel now
-read -p "🚀 Do you want to start the tunnel now? (Y/n): " start_tunnel
-start_tunnel=${start_tunnel:-Y}
+if [ "$service_installed" = true ]; then
+    # Start the service
+    echo "🚀 Starting Cloudflare Tunnel service..."
+    if sudo systemctl start cloudflared; then
+        echo "✅ Cloudflare Tunnel service started!"
+    else
+        echo "❌ Failed to start Cloudflare Tunnel service."
+        echo "📋 Checking service status..."
+        sudo systemctl status cloudflared --no-pager -l
+        exit 1
+    fi
 
-if [[ $start_tunnel =~ ^[Yy]$ ]]; then
+    # Enable service to start on boot
+    echo "⚙️  Enabling Cloudflare Tunnel service to start on boot..."
+    if sudo systemctl enable cloudflared; then
+        echo "✅ Cloudflare Tunnel service enabled for auto-start!"
+    else
+        echo "⚠️  Warning: Failed to enable auto-start for Cloudflare Tunnel service."
+    fi
+
+    # Check service status
     echo ""
-    echo "🚀 Starting Cloudflare Tunnel..."
-    echo "   Your n8n instance will be available at: https://$hostname"
-    echo "   Press Ctrl+C to stop the tunnel"
+    echo "📊 Service Status:"
+    sudo systemctl status cloudflared --no-pager -l
+
     echo ""
-    
-    # Start the tunnel
-    cloudflared tunnel run "$tunnel_name_for_creation"
+    echo "🎉 Cloudflare Tunnel setup complete!"
+    echo ""
+    echo "🌐 Your n8n instance is now available at: https://$hostname"
+    echo "🔧 Service commands:"
+    echo "   Check status: sudo systemctl status cloudflared"
+    echo "   Stop service: sudo systemctl stop cloudflared"
+    echo "   Start service: sudo systemctl start cloudflared"
+    echo "   View logs: sudo journalctl -u cloudflared -f"
 else
     echo ""
-    echo "📝 Tunnel setup complete! To start the tunnel later, run:"
-    echo "   cloudflared tunnel run $tunnel_name_for_creation"
+    echo "❌ Service installation failed. You can try running the tunnel manually:"
+    echo "   cloudflared tunnel run $tunnel_name"
     echo ""
-    echo "🌐 Your n8n instance will be available at:"
-    echo "   https://$hostname"
+    echo "🌐 Your n8n instance should still be available at: https://$hostname"
+    echo "   (when running the tunnel manually)"
+fi
     echo ""
     echo "🔧 To run tunnel as a service (background), run:"
     echo "   sudo cloudflared service install"
