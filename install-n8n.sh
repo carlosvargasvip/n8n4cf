@@ -48,8 +48,8 @@ else
 fi
 
 # Get installation directory
-read -p "Enter installation directory name [n8n-postgres]: " install_dir
-install_dir=${install_dir:-n8n-postgres}
+read -p "Enter installation directory name [n8ncf]: " install_dir
+install_dir=${install_dir:-n8ncf}
 
 # Check if directory already exists
 if [ -d "$install_dir" ]; then
