@@ -13,14 +13,15 @@ if ! command -v git &> /dev/null; then
     exit 1
 fi
 
-# Check if docker and docker-compose are installed
+# Check if docker and docker compose are installed
 if ! command -v docker &> /dev/null; then
     echo "❌ Docker is not installed. Please install Docker first."
     exit 1
 fi
 
-if ! command -v docker-compose &> /dev/null; then
-    echo "❌ Docker Compose is not installed. Please install Docker Compose first."
+if ! docker compose version &> /dev/null; then
+    echo "❌ Docker Compose plugin is not available. Please update Docker to a recent version."
+    echo "💡 Docker Compose is now built into Docker. Update Docker to get the compose plugin."
     exit 1
 fi
 
