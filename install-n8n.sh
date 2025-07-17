@@ -47,9 +47,8 @@ else
     export DOCKER_SUDO=""
 fi
 
-# Get installation directory
-read -p "Enter installation directory name [n8ncf]: " install_dir
-install_dir=${install_dir:-n8ncf}
+# Set installation directory
+install_dir="n8ncf"
 
 # Check if directory already exists
 if [ -d "$install_dir" ]; then
