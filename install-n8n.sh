@@ -108,11 +108,12 @@ if [[ $run_setup =~ ^[Yy]$ ]]; then
     echo ""
     echo "🔄 Running n8n setup script..."
     echo "=============================="
+    cd n8ncf
     ./setup-n8n.sh
 else
     echo ""
     echo "📝 Installation complete! To set up n8n later:"
-    echo "   cd $install_dir"
+    echo "   cd n8ncf"
     echo "   ./setup-n8n.sh"
     echo ""
     echo "🌐 After setup, n8n will be available at: http://localhost:5678"
