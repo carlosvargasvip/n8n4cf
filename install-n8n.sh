@@ -63,21 +63,6 @@ if [ -d "$install_dir" ]; then
     fi
 fi
 
-# Clone the repository
-echo "📥 Cloning repository..."
-
-if git clone https://github.com/carlosvargasvip/n8n4cf.git "$install_dir"; then
-    echo "✅ Repository cloned successfully!"
-else
-    echo "❌ Failed to clone repository. Please check your internet connection and try again."
-    exit 1
-fi
-
-# Change to the cloned directory
-cd "$install_dir"
-echo "📁 Working in directory: $(pwd)"
-echo ""
-
 # Check if required files exist
 required_files=("docker-compose.yml" "setup-n8n.sh" "setup-cloudflare-tunnel.sh")
 missing_files=()
@@ -98,14 +83,14 @@ fi
 # Make all shell scripts executable
 chmod +x *.sh
 
-echo "🔧 Repository setup complete!"
+
 echo ""
-echo "📝 Installation complete!"
+echo "📝 Installation Checks complete!"
 echo ""
 echo "🚀 To set up n8n, run:"
 echo "   ./setup-n8n.sh"
 echo ""
-echo "🌐 After setup, n8n will be available at: http://localhost:5678"
+
 
 echo ""
 echo "🎯 Installation completed successfully!"
