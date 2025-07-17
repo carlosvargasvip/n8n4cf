@@ -100,24 +100,12 @@ chmod +x setup-n8n.sh
 echo "🔧 Repository setup complete!"
 echo ""
 
-# Ask if user wants to run the setup immediately
-read -p "🚀 Do you want to run the n8n setup now? (Y/n): " run_setup
-run_setup=${run_setup:-Y}
-
-if [[ $run_setup =~ ^[Yy]$ ]]; then
-    echo ""
-    echo "🔄 Running n8n setup script..."
-    echo "=============================="
-    cd n8ncf
-    ./setup-n8n.sh
-else
-    echo ""
-    echo "📝 Installation complete! To set up n8n later:"
-    echo "   cd n8ncf"
-    echo "   ./setup-n8n.sh"
-    echo ""
-    echo "🌐 After setup, n8n will be available at: http://localhost:5678"
-fi
+# Automatically run the setup script
+echo ""
+echo "🔄 Running n8n setup script..."
+echo "=============================="
+cd n8ncf
+./setup-n8n.sh
 
 echo ""
 echo "🎯 Installation completed successfully!"
