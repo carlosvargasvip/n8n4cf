@@ -101,7 +101,7 @@ echo "🔧 Repository setup complete!"
 echo ""
 
 # Automatically run the setup script
-cd ./n8ncf
+cd "$install_dir"
 echo ""
 echo "🔄 Next Step: Run n8n setup script..."
 echo "======================================"
