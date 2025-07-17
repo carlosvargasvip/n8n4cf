@@ -18,22 +18,6 @@ if ! docker compose version &> /dev/null; then
     exit 1
 fi
 
-# Create project directory
-read -p "Enter project directory name [n8ncf]: " project_dir
-project_dir=${project_dir:-n8ncf}
-
-if [ -d "$project_dir" ]; then
-    echo "Warning: Directory '$project_dir' already exists!"
-    read -p "Do you want to continue and potentially overwrite files? (y/N): " continue_setup
-    if [[ ! $continue_setup =~ ^[Yy]$ ]]; then
-        echo "Aborted."
-        exit 0
-    fi
-else
-    mkdir -p "$project_dir"
-fi
-
-cd "$project_dir"
 echo "📁 Working in directory: $(pwd)"
 echo ""
 
@@ -91,16 +75,6 @@ fi
 
 echo ""
 
-# Check if docker-compose.yml exists
-if [ ! -f "docker-compose.yml" ]; then
-    echo "❌ docker-compose.yml not found in current directory!"
-    echo "   Make sure you're running this script from the correct directory."
-    exit 1
-fi
-
-echo "✅ Found docker-compose.yml"
-echo ""
-
 # Create init-data.sh for PostgreSQL initialization
 echo "📝 Creating PostgreSQL initialization script..."
 
@@ -132,50 +106,90 @@ echo "n8n Port: 5678"
 echo "Auto-updates: n8n (weekly), PostgreSQL (monthly)"
 echo ""
 
-# Ask if user wants to start the services
-read -p "🚀 Do you want to start the n8n services now? (y/N): " start_services
+# Start the services
+echo ""
+echo "🔄 Starting n8n with PostgreSQL..."
 
-if [[ $start_services =~ ^[Yy]$ ]]; then
+# Pull images first
+echo "📥 Pulling Docker images..."
+docker compose pull
+
+# Start services
+echo "🚀 Starting services..."
+docker compose up -d
+
+echo ""
+echo "⏳ Waiting for services to be ready..."
+sleep 10
+
+# Check if services are running
+if docker compose ps | grep -q "Up"; then
     echo ""
-    echo "🔄 Starting n8n with PostgreSQL..."
+    echo "🎉 Success! n8n is now running!"
+    echo ""
     
-    # Pull images first
-    echo "📥 Pulling Docker images..."
-    docker compose pull
+    # Wait for n8n to be fully ready
+    echo "⏳ Waiting for n8n to be fully ready..."
+    max_attempts=30
+    attempt=0
     
-    # Start services
-    echo "🚀 Starting services..."
-    docker compose up -d
+    while [ $attempt -lt $max_attempts ]; do
+        if curl -s -o /dev/null -w "%{http_code}" http://localhost:5678 | grep -q "200"; then
+            echo "✅ n8n is responding and ready!"
+            break
+        else
+            echo "   Attempt $((attempt + 1))/$max_attempts - n8n is starting up..."
+            sleep 5
+            attempt=$((attempt + 1))
+        fi
+    done
+    
+    if [ $attempt -eq $max_attempts ]; then
+        echo "⚠️  n8n may still be starting up. Please wait a moment and try accessing it."
+    fi
     
     echo ""
-    echo "⏳ Waiting for services to be ready..."
-    sleep 10
+    echo "🌐 Access n8n at: http://localhost:5678"
+    echo "📊 Check status: docker compose ps"
+    echo "📋 View logs: docker compose logs -f"
+    echo "🛑 Stop services: docker compose down"
+    echo ""
+    echo "💡 First time setup:"
+    echo "   1. Go to http://localhost:5678"
+    echo "   2. Create your admin account"
+    echo "   3. Start building your workflows!"
+    echo ""
     
-    # Check if services are running
-    if docker compose ps | grep -q "Up"; then
+    # Ask if user wants to set up Cloudflare Tunnel
+    read -p "🔒 Do you want to set up Cloudflare Tunnel for secure remote access? (y/N): " setup_tunnel
+    if [[ $setup_tunnel =~ ^[Yy]$ ]]; then
         echo ""
-        echo "🎉 Success! n8n is now running!"
-        echo ""
-        echo "🌐 Access n8n at: http://localhost:5678"
-        echo "📊 Check status: docker compose ps"
-        echo "📋 View logs: docker compose logs -f"
-        echo "🛑 Stop services: docker compose down"
-        echo ""
-        echo "💡 First time setup:"
-        echo "   1. Go to http://localhost:5678"
-        echo "   2. Create your admin account"
-        echo "   3. Start building your workflows!"
+        if [ -f "setup-cloudflare-tunnel.sh" ]; then
+            chmod +x setup-cloudflare-tunnel.sh
+            ./setup-cloudflare-tunnel.sh
+        else
+            echo "❌ setup-cloudflare-tunnel.sh not found in current directory."
+            echo "💡 You can set up Cloudflare Tunnel manually with these steps:"
+            echo "   1. Install Cloudflare Tunnel (cloudflared):"
+            echo "      curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb -o cloudflared.deb"
+            echo "      sudo dpkg -i cloudflared.deb"
+            echo "   2. Login to Cloudflare:"
+            echo "      cloudflared tunnel login"
+            echo "   3. Create a tunnel:"
+            echo "      cloudflared tunnel create n8n-tunnel"
+            echo "   4. Configure tunnel to point to localhost:5678"
+            echo "   5. Run tunnel to secure your n8n instance"
+            echo ""
+            echo "   📖 Full tutorial: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/"
+        fi
     else
-        echo "❌ Some services failed to start. Check logs with:"
-        echo "   docker compose logs"
+        echo "🔒 Cloudflare Tunnel setup skipped."
+        echo "💡 You can set it up later by running: ./setup-cloudflare-tunnel.sh"
+        echo "   📖 Or follow the manual steps at: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/"
     fi
 else
-    echo ""
-    echo "📝 Setup complete! To start n8n later, run:"
-    echo "   cd $project_dir"
-    echo "   docker compose up -d"
-    echo ""
-    echo "🌐 n8n will be available at: http://localhost:5678"
+    echo "❌ Some services failed to start. Check logs with:"
+    echo "   docker compose logs"
 fi
 
 echo ""
