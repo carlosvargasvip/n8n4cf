@@ -105,7 +105,4 @@ echo ""
 echo "🔄 Next Step: Run n8n setup script..."
 echo "======================================"
 echo " ./setup-n8n.sh" 
-cd n8ncf
-
-echo ""
-
+cd ~/n8ncf
