@@ -51,12 +51,42 @@ if [ "$create_new_env" = true ]; then
     read -p "Non-root user: " pg_nonroot_user
     read -p "Non-root password: " pg_nonroot_password
     
+    echo ""
+    echo "Enter n8n domain configuration:"
+    echo ""
+    
+    read -p "Domain name (e.g., yourdomain.com): " domain_name
+    read -p "Subdomain for n8n (e.g., n8n): " subdomain
+    read -p "Timezone (e.g., America/New_York): " timezone
+    
+    echo ""
+    echo "Enter n8n SMTP configuration (for email notifications):"
+    echo ""
+    
+    read -p "SMTP Host (e.g., smtp.gmail.com): " smtp_host
+    read -p "SMTP Port (e.g., 587): " smtp_port
+    read -p "SMTP Username: " smtp_user
+    read -p "SMTP Password: " smtp_pass
+    read -p "SMTP Sender email: " smtp_sender
+    
+    # Set default values if empty
+    timezone=${timezone:-UTC}
+    smtp_port=${smtp_port:-587}
+    
     # Create .env file
     echo "POSTGRES_USER=$pg_user" > .env
     echo "POSTGRES_PASSWORD=$pg_password" >> .env
     echo "POSTGRES_DB=$pg_db" >> .env
     echo "POSTGRES_NON_ROOT_USER=$pg_nonroot_user" >> .env
     echo "POSTGRES_NON_ROOT_PASSWORD=$pg_nonroot_password" >> .env
+    echo "DOMAIN_NAME=$domain_name" >> .env
+    echo "SUBDOMAIN=$subdomain" >> .env
+    echo "GENERIC_TIMEZONE=$timezone" >> .env
+    echo "N8N_SMTP_HOST=$smtp_host" >> .env
+    echo "N8N_SMTP_PORT=$smtp_port" >> .env
+    echo "N8N_SMTP_USER=$smtp_user" >> .env
+    echo "N8N_SMTP_PASS=$smtp_pass" >> .env
+    echo "N8N_SMTP_SENDER=$smtp_sender" >> .env
     echo "✅ .env file created!"
 fi
 
