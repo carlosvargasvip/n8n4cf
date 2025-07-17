@@ -190,19 +190,23 @@ echo ""
 # Install and start tunnel as a service
 echo "🔧 Installing Cloudflare Tunnel as a system service..."
 
+# Clean up any existing conflicting configs
+if [ -f "/etc/cloudflared/config.yml" ]; then
+    echo "⚠️  Removing existing system config to avoid conflicts..."
+    sudo rm -f /etc/cloudflared/config.yml
+    sudo rm -f /etc/cloudflared/*.json
+fi
+
 # Try different methods to install the service
 echo "📝 Attempting service installation..."
 
-# Method 1: Install with explicit config path
-if sudo cloudflared --config "$config_file" service install; then
-    echo "✅ Cloudflare Tunnel service installed successfully!"
-    service_installed=true
-elif sudo cloudflared service install --config "$config_file"; then
+# Method 1: Install with explicit config path using correct flag syntax
+if sudo cloudflared --config="$config_file" service install; then
     echo "✅ Cloudflare Tunnel service installed successfully!"
     service_installed=true
 else
     # Method 2: Copy config to system location and install
-    echo "⚠️  Standard installation failed. Trying system config location..."
+    echo "⚠️  User config installation failed. Trying system config location..."
     sudo mkdir -p /etc/cloudflared
     sudo cp "$config_file" /etc/cloudflared/config.yml
     sudo cp "$config_dir/$tunnel_id.json" /etc/cloudflared/
