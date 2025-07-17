@@ -65,8 +65,22 @@ fi
 
 # Clone the repository
 echo "📥 Cloning repository..."
+echo "Target directory: $install_dir"
+echo "Current working directory: $(pwd)"
+
 if git clone https://github.com/carlosvargasvip/n8n4cf.git "$install_dir"; then
     echo "✅ Repository cloned successfully!"
+    echo "Checking if directory exists: $install_dir"
+    if [ -d "$install_dir" ]; then
+        echo "✅ Directory exists"
+        echo "Contents of $install_dir:"
+        ls -la "$install_dir"
+    else
+        echo "❌ Directory $install_dir does not exist after cloning"
+        echo "Available directories:"
+        ls -la
+        exit 1
+    fi
 else
     echo "❌ Failed to clone repository. Please check your internet connection and try again."
     exit 1
@@ -78,7 +92,7 @@ echo "📁 Working in directory: $(pwd)"
 echo ""
 
 # Check if required files exist
-required_files=("docker-compose.yml" "setup-n8n.sh" "setup-cloudflare-tunnel.sh")
+required_files=("docker-compose.yml" "setup-n8n.sh")
 missing_files=()
 
 for file in "${required_files[@]}"; do
@@ -100,11 +114,26 @@ chmod +x setup-n8n.sh
 echo "🔧 Repository setup complete!"
 echo ""
 
-# Automatically run the setup script
-cd "$install_dir"
+# Change to the cloned directory
 echo ""
-echo "🔄 Next Step: Run n8n setup script..."
-echo "======================================"
-echo " ./setup-n8n.sh" 
+echo "📁 Changing to installation directory..."
+
+if cd "$install_dir"; then
+    echo "✅ Successfully changed to directory: $(pwd)"
+    echo ""
+    echo "📝 Installation complete!"
+    echo ""
+    echo "🚀 To set up n8n, run:"
+    echo "   ./setup-n8n.sh"
+    echo ""
+    echo "🌐 After setup, n8n will be available at: http://localhost:5678"
+else
+    echo "❌ Failed to change to directory: $install_dir"
+    echo "Current directory: $(pwd)"
+    echo "Available directories:"
+    ls -la
+    exit 1
+fi
 
 echo ""
+echo "🎯 Installation completed successfully!"
