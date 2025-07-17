@@ -1,47 +1,23 @@
 #!/bin/bash
 
-# Cloudflare Tunnel setup script for n8n
+# Cloudflare Tunnel setup script for n8n using Docker
 
-echo "☁️ Cloudflare Tunnel Setup for n8n"
-echo "==================================="
+echo "☁️ Cloudflare Tunnel Setup for n8n (Docker)"
+echo "============================================="
 echo ""
 
-# Check if cloudflared is installed
-if ! command -v cloudflared &> /dev/null; then
-    echo "📥 Installing Cloudflare Tunnel (cloudflared)..."
-    
-    # Download and install cloudflared
-    curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb -o cloudflared.deb
-    
-    if sudo dpkg -i cloudflared.deb; then
-        echo "✅ Cloudflared installed successfully!"
-        rm cloudflared.deb
-    else
-        echo "❌ Failed to install cloudflared. Please check your system and try again."
-        exit 1
-    fi
-else
-    echo "✅ Cloudflared is already installed!"
+# Check if docker is available
+if ! command -v docker &> /dev/null; then
+    echo "❌ Docker is not installed. Please install Docker first."
+    exit 1
 fi
 
-echo ""
-
-# Check if user is already logged in
-if cloudflared tunnel list &> /dev/null; then
-    echo "✅ Already logged into Cloudflare!"
-else
-    echo "🔐 Please login to Cloudflare..."
-    echo "   This will open a browser window for authentication."
-    read -p "Press Enter to continue..."
-    
-    if cloudflared tunnel login; then
-        echo "✅ Successfully logged into Cloudflare!"
-    else
-        echo "❌ Failed to login to Cloudflare. Please try again."
-        exit 1
-    fi
+if ! docker compose version &> /dev/null; then
+    echo "❌ Docker Compose plugin is not available. Please update Docker to a recent version."
+    exit 1
 fi
 
+echo "✅ Docker and Docker Compose are available!"
 echo ""
 
 # Get tunnel configuration from user
@@ -70,11 +46,26 @@ hostname="$subdomain.$user_domain"
 tunnel_name="$subdomain"
 
 echo "✅ Using domain: $hostname"
+echo ""
+
+# Check if user is logged in to Cloudflare
+echo "🔐 Logging into Cloudflare..."
+echo "   This will open a browser window for authentication."
+read -p "Press Enter to continue..."
+
+# Login using Docker
+if docker run --rm -v ~/.cloudflared:/home/nonroot/.cloudflared cloudflare/cloudflared:latest tunnel login; then
+    echo "✅ Successfully logged into Cloudflare!"
+else
+    echo "❌ Failed to login to Cloudflare. Please try again."
+    exit 1
+fi
 
 echo ""
 
 # Check if tunnel already exists
-if cloudflared tunnel list | grep -q "$tunnel_name"; then
+echo "🔍 Checking for existing tunnels..."
+if docker run --rm -v ~/.cloudflared:/home/nonroot/.cloudflared cloudflare/cloudflared:latest tunnel list | grep -q "$tunnel_name"; then
     echo "⚠️  Tunnel '$tunnel_name' already exists!"
     read -p "Do you want to use the existing tunnel? (Y/n): " use_existing
     use_existing=${use_existing:-Y}
@@ -87,7 +78,7 @@ if cloudflared tunnel list | grep -q "$tunnel_name"; then
 else
     # Create the tunnel
     echo "🔧 Creating tunnel: $tunnel_name"
-    if cloudflared tunnel create "$tunnel_name"; then
+    if docker run --rm -v ~/.cloudflared:/home/nonroot/.cloudflared cloudflare/cloudflared:latest tunnel create "$tunnel_name"; then
         echo "✅ Tunnel '$tunnel_name' created successfully!"
     else
         echo "❌ Failed to create tunnel. Please check your permissions and try again."
@@ -98,7 +89,8 @@ fi
 echo ""
 
 # Get tunnel ID
-tunnel_id=$(cloudflared tunnel list | grep "$tunnel_name" | awk '{print $1}')
+echo "🔍 Getting tunnel ID..."
+tunnel_id=$(docker run --rm -v ~/.cloudflared:/home/nonroot/.cloudflared cloudflare/cloudflared:latest tunnel list | grep "$tunnel_name" | awk '{print $1}')
 if [ -z "$tunnel_id" ]; then
     echo "❌ Could not find tunnel ID. Please check the tunnel was created properly."
     exit 1
@@ -106,21 +98,17 @@ fi
 
 echo "🔍 Found tunnel ID: $tunnel_id"
 
-# Create config directory if it doesn't exist
-config_dir="$HOME/.cloudflared"
-mkdir -p "$config_dir"
-
 # Create configuration file
-config_file="$config_dir/config.yml"
+config_file="$HOME/.cloudflared/config.yml"
 echo "📝 Creating tunnel configuration..."
 
 cat > "$config_file" << EOF
 tunnel: $tunnel_id
-credentials-file: $config_dir/$tunnel_id.json
+credentials-file: /home/nonroot/.cloudflared/$tunnel_id.json
 
 ingress:
   - hostname: $hostname
-    service: http://localhost:5678
+    service: http://host.docker.internal:5678
   - service: http_status:404
 EOF
 
@@ -132,106 +120,41 @@ echo "📋 Tunnel Configuration:"
 echo "========================"
 echo "Tunnel Name: $tunnel_name"
 echo "Tunnel ID: $tunnel_id"
-echo "Local Service: http://localhost:5678"
+echo "Local Service: http://host.docker.internal:5678"
 echo "Public URL: https://$hostname"
 echo ""
 
-# Install and start tunnel as a service
-echo "🔧 Installing Cloudflare Tunnel as a system service..."
+# Start the tunnel service using the tunnel profile
+echo "🚀 Starting Cloudflare Tunnel service..."
 
-# Verify config file exists
-if [ ! -f "$config_file" ]; then
-    echo "❌ Config file not found at $config_file"
-    exit 1
-fi
-
-echo "✅ Config file found at: $config_file"
-
-# Try different methods to install the service
-echo "📝 Attempting service installation..."
-
-# Method 1: Install with explicit config path
-if sudo cloudflared --config "$config_file" service install; then
-    echo "✅ Cloudflare Tunnel service installed successfully (Method 1)!"
-    service_installed=true
-elif sudo cloudflared service install --config "$config_file"; then
-    echo "✅ Cloudflare Tunnel service installed successfully (Method 2)!"
-    service_installed=true
-else
-    # Method 3: Copy config to system location and install
-    echo "⚠️  Standard installation failed. Trying system config location..."
-    sudo mkdir -p /etc/cloudflared
-    sudo cp "$config_file" /etc/cloudflared/config.yml
-    sudo cp "$config_dir/$tunnel_id.json" /etc/cloudflared/
+if docker compose --profile tunnel up -d cloudflared; then
+    echo "✅ Cloudflare Tunnel service started!"
     
-    # Update config to use system paths
-    sudo sed -i "s|$config_dir|/etc/cloudflared|g" /etc/cloudflared/config.yml
-    
-    if sudo cloudflared service install; then
-        echo "✅ Cloudflare Tunnel service installed successfully (Method 3)!"
-        service_installed=true
-    else
-        echo "❌ All installation methods failed."
-        service_installed=false
-    fi
-fi
-
-if [ "$service_installed" = true ]; then
-
-if [ "$service_installed" = true ]; then
-    # Start the service
-    echo "🚀 Starting Cloudflare Tunnel service..."
-    if sudo systemctl start cloudflared; then
-        echo "✅ Cloudflare Tunnel service started!"
-    else
-        echo "❌ Failed to start Cloudflare Tunnel service."
-        echo "📋 Checking service status..."
-        sudo systemctl status cloudflared --no-pager -l
-        exit 1
-    fi
-
-    # Enable service to start on boot
-    echo "⚙️  Enabling Cloudflare Tunnel service to start on boot..."
-    if sudo systemctl enable cloudflared; then
-        echo "✅ Cloudflare Tunnel service enabled for auto-start!"
-    else
-        echo "⚠️  Warning: Failed to enable auto-start for Cloudflare Tunnel service."
-    fi
-
     # Check service status
     echo ""
     echo "📊 Service Status:"
-    sudo systemctl status cloudflared --no-pager -l
-
+    docker compose ps cloudflared
+    
     echo ""
     echo "🎉 Cloudflare Tunnel setup complete!"
     echo ""
     echo "🌐 Your n8n instance is now available at: https://$hostname"
     echo "🔧 Service commands:"
-    echo "   Check status: sudo systemctl status cloudflared"
-    echo "   Stop service: sudo systemctl stop cloudflared"
-    echo "   Start service: sudo systemctl start cloudflared"
-    echo "   View logs: sudo journalctl -u cloudflared -f"
+    echo "   Check status: docker compose ps cloudflared"
+    echo "   View logs: docker compose logs cloudflared -f"
+    echo "   Stop tunnel: docker compose --profile tunnel stop cloudflared"
+    echo "   Start tunnel: docker compose --profile tunnel start cloudflared"
+    echo ""
+    echo "💡 Note: You still need to add a CNAME record in Cloudflare DNS:"
+    echo "   Type: CNAME"
+    echo "   Name: $subdomain"
+    echo "   Target: $tunnel_id.cfargotunnel.com"
+    echo "   Proxy status: Proxied (orange cloud)"
 else
-    echo ""
-    echo "❌ Service installation failed. You can try running the tunnel manually:"
-    echo "   cloudflared tunnel run $tunnel_name"
-    echo ""
-    echo "🌐 Your n8n instance should still be available at: https://$hostname"
-    echo "   (when running the tunnel manually)"
-fi
-    echo ""
-    echo "🔧 To run tunnel as a service (background), run:"
-    echo "   sudo cloudflared service install"
-    echo "   sudo systemctl start cloudflared"
-    echo "   sudo systemctl enable cloudflared"
+    echo "❌ Failed to start Cloudflare Tunnel service."
+    echo "📋 Check logs with: docker compose logs cloudflared"
+    exit 1
 fi
 
 echo ""
 echo "🎯 Cloudflare Tunnel setup completed successfully!"
-echo ""
-echo "💡 Tips:"
-echo "   - Your tunnel is now secure and accessible from anywhere"
-echo "   - No need to open firewall ports"
-echo "   - Traffic is encrypted end-to-end"
-echo "   - Manage your tunnel at: https://one.dash.cloudflare.com/"
