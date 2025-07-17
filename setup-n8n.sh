@@ -52,13 +52,11 @@ if [ "$create_new_env" = true ]; then
     read -p "Non-root password: " pg_nonroot_password
     
     # Create .env file
-    cat > .env << EOF
-POSTGRES_USER=$pg_user
-POSTGRES_PASSWORD=$pg_password
-POSTGRES_DB=$pg_db
-POSTGRES_NON_ROOT_USER=$pg_nonroot_user
-POSTGRES_NON_ROOT_PASSWORD=$pg_nonroot_password
-EOF
+    echo "POSTGRES_USER=$pg_user" > .env
+    echo "POSTGRES_PASSWORD=$pg_password" >> .env
+    echo "POSTGRES_DB=$pg_db" >> .env
+    echo "POSTGRES_NON_ROOT_USER=$pg_nonroot_user" >> .env
+    echo "POSTGRES_NON_ROOT_PASSWORD=$pg_nonroot_password" >> .env
     echo "✅ .env file created!"
 fi
 
