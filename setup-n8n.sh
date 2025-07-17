@@ -126,7 +126,7 @@ echo ""
 # Show configuration summary
 echo "📋 Configuration Summary:"
 echo "========================="
-echo "Project Directory: $project_dir"
+echo "Working Directory: $(pwd)"
 echo "Database: PostgreSQL 16"
 echo "n8n Port: 5678"
 echo "Auto-updates: n8n (weekly), PostgreSQL (monthly)"
