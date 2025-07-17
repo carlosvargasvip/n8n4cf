@@ -24,6 +24,28 @@ if ! command -v docker-compose &> /dev/null; then
     exit 1
 fi
 
+# Check if user can run Docker commands without sudo
+if ! docker ps &> /dev/null; then
+    if sudo docker ps &> /dev/null; then
+        echo "⚠️  Docker requires sudo privileges."
+        echo "💡 Consider adding your user to the docker group:"
+        echo "   sudo usermod -aG docker $USER"
+        echo "   Then log out and log back in."
+        echo ""
+        read -p "Continue with sudo for Docker commands? (y/N): " use_sudo
+        if [[ ! $use_sudo =~ ^[Yy]$ ]]; then
+            echo "❌ Installation aborted."
+            exit 1
+        fi
+        export DOCKER_SUDO="sudo"
+    else
+        echo "❌ Cannot access Docker. Please check Docker installation and permissions."
+        exit 1
+    fi
+else
+    export DOCKER_SUDO=""
+fi
+
 # Get installation directory
 read -p "Enter installation directory name [n8n-postgres]: " install_dir
 install_dir=${install_dir:-n8n-postgres}
