@@ -57,3 +57,16 @@ services:
       - WATCHTOWER_INCLUDE_RESTARTING=true  # Also update restarting containers
     labels:
       - "com.centurylinklabs.watchtower.enable=false"  # Don't update watchtower itself
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: always
+    command: tunnel --config /home/nonroot/.cloudflared/config.yml run
+    volumes:
+      - ~/.cloudflared:/home/nonroot/.cloudflared:ro
+    depends_on:
+      - n8n
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    profiles:
+      - tunnel
