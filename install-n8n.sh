@@ -78,7 +78,7 @@ echo "📁 Working in directory: $(pwd)"
 echo ""
 
 # Check if required files exist
-required_files=("docker-compose.yml" "setup-n8n.sh")
+required_files=("docker-compose.yml" "setup-n8n.sh" "setup-cloudflare-tunnel.sh")
 missing_files=()
 
 for file in "${required_files[@]}"; do
